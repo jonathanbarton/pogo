@@ -24,6 +24,7 @@ You will need to copy the `pogo.sample.conf` file to `pogo.conf`, then add optio
 
     CORE COMMANDS
       list:                       List all available hosts.
+      list-db:                    List all available database instances.
       grant:                      Grants access to your IP to the bastion security group.
       revoke:                     Revokes access to your IP to the bastion security group.
       bastion:                    Logs you into the bastion itself.
@@ -33,6 +34,9 @@ You will need to copy the `pogo.sample.conf` file to `pogo.conf`, then add optio
       user@host:                  Logs you into host via the bastion and the specified user.
       service#cluster:            Logs you into a specific service on the specified cluster.
 
+    TUNNELS
+      tunnel <db-instance-id>     Creates ssh tunnel to a specified database instance id.
+      
     FLAGS
       --awscli-profile <profile>  Switches your AWSCLI profile to a different one in your .aws/config file.
 
