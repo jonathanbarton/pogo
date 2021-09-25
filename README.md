@@ -12,15 +12,15 @@ Installation instructions for these are on their respective pages, but on a Mac,
 When you're done with that, follow the instructions to [configure the aws cli](http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html). **Important: Enter `json` for your output format.**
 
 ## Configuration
-You will need to copy the `heimdall.sample.conf` file to `heimdall.conf`, then add options specific to your organization.
+You will need to copy the `pogo.sample.conf` file to `pogo.conf`, then add options specific to your organization.
 
 ## Usage
 
-    $ ./heimdall
+    $ ./pogo
     Connect to different AWS EC2 hosts via a Bastion/Jump host.
 
     USAGE
-      ./heimdall <command> <target> [flags]
+      ./pogo <command> <target> [flags]
 
     CORE COMMANDS
       list:                       List all available hosts.
@@ -37,6 +37,6 @@ You will need to copy the `heimdall.sample.conf` file to `heimdall.conf`, then a
       --awscli-profile <profile>  Switches your AWSCLI profile to a different one in your .aws/config file.
 
     EXAMPLES
-      $ ./heimdall list
-      $ ./heimdall ec2-user@Prod1
-      $ ./heimdall backend#production
+      $ ./pogo list
+      $ ./pogo ec2-user@Prod1
+      $ ./pogo backend#production
