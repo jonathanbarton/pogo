@@ -2,14 +2,15 @@
 
 # This is a script that allows you to programmatically connect
 # to different AWS EC2 hosts via a Bastion host.
-# For more info and to report issues: https://github.com/needcaffeine/heimdall
+# For original source code modified: https://github.com/needcaffeine/heimdall
+# For issues: https://github.com/jonathanbarton/pogo 
 
 # Usage:
-# $ ./heimdall
+# $ ./pogo
 
 # Configuration options for your organization.
-heimdallDir="$(dirname "$(readlink "$0")")"
-source "${heimdallDir}/heimdall.conf"
+pogoDir="$(dirname "$(readlink "$0")")"
+source "${pogoDir}/pogo.conf"
 
 ###############################################################################
 # Do not modify the script below this line unless you know what you're doing. #
@@ -98,12 +99,14 @@ if [[ $numArgs -eq 0 ]]; then
     echo Connect to different AWS EC2 hosts via a Bastion/Jump host.
     echo
     echo ${bold}USAGE${normal}
-    echo "  ./heimdall <command> <target> [flags]"
+    echo "  ./pogo <command> <target> [flags]"
     echo
     echo ${bold}CORE COMMANDS${normal}
     echo "  list:                       List all available hosts."
+    echo "  list-db                     List all database instances."
     echo "  grant:                      Grants access to your IP to the bastion security group."
     echo "  revoke:                     Revokes access to your IP to the bastion security group."
+    echo "  show:                       Shows current IP address."
     echo "  bastion:                    Logs you into the bastion itself."
     echo
     echo ${bold}TARGETS${normal}
@@ -111,23 +114,30 @@ if [[ $numArgs -eq 0 ]]; then
     echo "  user@host:                  Logs you into host via the bastion and the specified user."
     echo "  service#cluster:            Logs you into a specific service on the specified cluster."
     echo
+    echo ${bold}TUNNELS${normal}
+    echo "  tunnel:                     Tunnel into host."
+    echo 
     echo ${bold}FLAGS${normal}
     echo "  --profile <profile>         Switches your AWSCLI profile to a different one in your .aws/config file."
-    echo "  NOTE:                       Every configurable variable found in heimdall.conf can be passed as a flag."
+    echo "  NOTE:                       Every configurable variable found in pogo.conf can be passed as a flag."
     echo "                              The format is to use lowercase, kebab-case names with a value."
     echo "                              Example: --bastion-host-name would set/override the config variable BASTION_HOST_NAME."
     echo
     echo ${bold}EXAMPLES${normal}
-    echo "  $ ./heimdall list"
-    echo "  $ ./heimdall ec2-user@Prod1"
-    echo "  $ ./heimdall backend#production"
+    echo "  $ ./pogo list"
+    echo "  $ ./pogo ec2-user@Prod1"
+    echo "  $ ./pogo backend#production"
     exit
 fi
 
 case ${args[0]} in
-    grant|revoke|lock|unlock)
+    show|grant|revoke|lock|unlock|tunnel)
         ip=`dig -4 +short myip.opendns.com @resolver1.opendns.com`
+        numArgs=($#)
         case ${args[0]} in
+            show)
+                echo "Your IP Address is: ${ip}"
+            ;;
             revoke|lock)
                 echo "Revoking your IP (${ip}/32) access to the ingress group..."
                 aws ec2 revoke-security-group-ingress --group-id ${BASTION_SECURITY_GROUP_ID} --protocol tcp --port 22 --cidr ${ip}/32 --profile ${PROFILE}
@@ -136,16 +146,26 @@ case ${args[0]} in
                 echo "Granting your IP (${ip}/32) access to the ingress group..."
                 aws ec2 authorize-security-group-ingress --group-id ${BASTION_SECURITY_GROUP_ID} --protocol tcp --port 22 --cidr ${ip}/32 --profile ${PROFILE}
                 ;;
+            tunnel)
+                if [[ $numArgs -eq 2 ]]; then
+                    instance_id=${args[1]}
+                    DB_ENDPOINT=`aws rds describe-db-instances --filters "Name=db-instance-id,Values=${instance_id}" --profile ${PROFILE} | jq ".DBInstances[] | .Endpoint.Address"`
+                    DB_PORT=`aws rds describe-db-instances --filters "Name=db-instance-id,Values=${instance_id}" --profile ${PROFILE} | jq ".DBInstances[] | .Endpoint.Port"`
+                    ssh -i ${SSH_KEY_FILE} -N -L ${TUNNEL_LOCAL_PORT}:${DB_ENDPOINT}:${DB_PORT} ${BASTION_USER}@${BASTION_DNS_NAME}
+                else
+                    echo "Missing DB Instance ID (Example: ./pogo tunnel prod-db-2)"
+                fi
+            ;;
             esac
             ;;
 
     list )
         echo "Listing all running instances:"
-        aws ec2 describe-instances --filters "Name=instance-state-name,Values=running" --profile ${PROFILE} \
-            | jq -r '.Reservations[].Instances[]'\
-            | jq -c '{Env: .Tags[] | select(.Key == "Env").Value, InstanceId: .InstanceId, Name: .Tags[] | select(.Key == "Name").Value}'\
-            | jq -s '.|=sort_by(.Env,.Name)'\
-            | jq -c '.[]'
+        aws ec2 describe-instances --profile ${PROFILE} | jq '[.Reservations | .[] | .Instances | .[] | select(.State.Name!="terminated") | {Name: (.Tags[]|select(.Key=="Name")|.Value), PrivateIpAddress: .PrivateIpAddress, VpcId: .VpcId, Subnet: .SubnetId, InstanceType: .InstanceType,State: .State.Name}]' 
+        ;;
+    list-db )
+        echo "Listing all database instances:"
+        aws rds describe-db-instances --profile ${PROFILE} | jq ".DBInstances[] | {DBInstanceIdentifier: .DBInstanceIdentifier, EndpointAddress: .Endpoint.Address }" 
         ;;
     bastion|* )
         # Do we need to figure out the dns name for our Bastion host?
@@ -239,7 +259,8 @@ case ${args[0]} in
                 fi
 
                 # Do the magic.
-                ssh -i ${SSH_KEY_FILE} -p ${BASTION_HOST_PORT:-22} -A -t ${BASTION_USER}@${BASTION_DNS_NAME} ssh -A -t ${user}@${PRIVATE_IP}
+                #ssh -i ${SSH_KEY_FILE} -p ${BASTION_HOST_PORT:-22} -A -t ${BASTION_USER}@${BASTION_DNS_NAME} ssh -A -t ${BASTION_USER}@${PRIVATE_IP} -v
+                ssh -i ${SSH_KEY_FILE} -o ProxyCommand="ssh -i ${SSH_KEY_FILE} -W %h:%p ${BASTION_USER}@${BASTION_DNS_NAME}"  ${BASTION_USER}@${PRIVATE_IP}
                 ;;
             esac
         ;;
