@@ -1,13 +1,15 @@
 # Readme
 
-This is a script that allows you to programmatically connect to different AWS EC2 hosts via a Bastion/Jump host.
+This is a script that allows you to programmatically connect to different AWS EC2 hosts and tunnel RDS instances to your localhost environment via a Bastion/Jump host.
+
+This tool is forked and modified from needcaffeine's heimdall tool.
 
 ## Pre-requisites
 You will need two external packages to get this thing to work.  
 - [aws cli](https://github.com/aws/aws-cli)
 - [jq](https://stedolan.github.io/jq/)
 
-Installation instructions for these are on their respective pages, but on a Mac, you can install these simply as `brew install awscli jq` (assuming you have Homebrew).  
+Installation instructions for these are on their respective pages, but on a Mac/Linux, you can install these simply as `brew install awscli jq` (assuming you have Homebrew).  
 
 When you're done with that, follow the instructions to [configure the aws cli](http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html). **Important: Enter `json` for your output format.**
 
